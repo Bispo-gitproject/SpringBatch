@@ -1,3 +1,4 @@
+
 package com.example.ProcessaAlunosAprovRepro.configuration;
 
 import com.example.ProcessaAlunosAprovRepro.Entities.boletimAlunosEntity;
@@ -12,7 +13,9 @@ import org.springframework.batch.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.item.database.builder.JdbcBatchItemWriterBuilder;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
+import org.springframework.batch.item.support.ClassifierCompositeItemWriter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
@@ -45,14 +48,17 @@ public class BatchConfig {
     }
 
     @Bean
-    public Step step1(JdbcBatchItemWriter<boletimAlunosEntity> writer, JdbcBatchItemWriter<boletimAlunosEntity> reprovadosWriter) {
+    public Step step1(
+            @Qualifier("compositeItemWriter") ClassifierCompositeItemWriter<boletimAlunosEntity> compositeItemWriter
+    ) {
         return stepBuilderFactory.get("step1")
                 .<boletimAlunosEntity, boletimAlunosEntity>chunk(10)
                 .reader(reader())
                 .processor(processor())
-                .writer(writer)
+                .writer(compositeItemWriter)
                 .build();
     }
+
 
     @Bean
     public AlunoItemProcessor processor() {
@@ -60,7 +66,7 @@ public class BatchConfig {
     }
 
     @Bean
-    public JdbcBatchItemWriter<boletimAlunosEntity> writer() {
+    public JdbcBatchItemWriter<boletimAlunosEntity> aprovadosWriter() {
         return new JdbcBatchItemWriterBuilder<boletimAlunosEntity>()
                 .dataSource(dataSource)
                 .sql("INSERT INTO aprovados (nome, classe, numeroChamada, mediaFinal, materia, ano, status) VALUES (:nome, :classe, :numeroChamada, :mediaFinal, :materia, :anoCorrente, :status)")
@@ -76,6 +82,23 @@ public class BatchConfig {
                 .itemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<>())
                 .build();
     }
+
+    @Bean
+    public ClassifierCompositeItemWriter<boletimAlunosEntity> compositeItemWriter(
+            @Qualifier("aprovadosWriter") JdbcBatchItemWriter<boletimAlunosEntity> aprovadosWriter,
+            @Qualifier("reprovadosWriter") JdbcBatchItemWriter<boletimAlunosEntity> reprovadosWriter
+    ) {
+        ClassifierCompositeItemWriter<boletimAlunosEntity> compositeItemWriter = new ClassifierCompositeItemWriter<>();
+        compositeItemWriter.setClassifier(item -> {
+            if ("Aprovado".equals(item.getStatus())) {
+                return aprovadosWriter;
+            } else {
+                return reprovadosWriter;
+            }
+        });
+        return compositeItemWriter;
+    }
+
 
     @Bean
     public Job importAlunoJob(JobCompletionNotificationListener listener, Step step1) {
