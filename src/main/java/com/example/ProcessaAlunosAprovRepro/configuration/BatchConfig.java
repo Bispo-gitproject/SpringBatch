@@ -18,7 +18,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
 
 import javax.sql.DataSource;
@@ -98,7 +97,6 @@ public class BatchConfig {
         });
         return compositeItemWriter;
     }
-
 
     @Bean
     public Job importAlunoJob(JobCompletionNotificationListener listener, Step step1) {
